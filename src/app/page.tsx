@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useMemo, useState } from "react";
+import { useSearchParams } from "next/navigation";
 import BraidControls from "@/app/components/BraidControls";
 import BraidViewport from "@/app/components/BraidViewport";
 import ConstraintPanel from "@/app/components/ConstraintPanel";
@@ -10,14 +11,43 @@ import {
   type BraidParams,
 } from "@/app/lib/braidMath";
 
+function parseNumber(value: string | null, fallback: number) {
+  const n = Number(value);
+  return Number.isFinite(n) ? n : fallback;
+}
+
+async function copyText(text: string) {
+  // Primary (modern) path
+  if (navigator.clipboard?.writeText) {
+    await navigator.clipboard.writeText(text);
+    return;
+  }
+
+  // Fallback path (older / restricted contexts)
+  const ta = document.createElement("textarea");
+  ta.value = text;
+  ta.setAttribute("readonly", "true");
+  ta.style.position = "fixed";
+  ta.style.left = "-9999px";
+  ta.style.top = "-9999px";
+  document.body.appendChild(ta);
+  ta.select();
+  document.execCommand("copy");
+  document.body.removeChild(ta);
+}
+
 export default function HomePage() {
-  const [params, setParams] = useState<BraidParams>({
-    radius: 12,
-    length: 120,
-    strandCount: 24,
-    angleDeg: 55,
-    tension: 0.55,
-  });
+  const searchParams = useSearchParams();
+
+  const [toast, setToast] = useState<string | null>(null);
+
+  const [params, setParams] = useState<BraidParams>(() => ({
+    radius: parseNumber(searchParams.get("radius"), 12),
+    length: parseNumber(searchParams.get("length"), 120),
+    strandCount: parseNumber(searchParams.get("strandCount"), 24),
+    angleDeg: parseNumber(searchParams.get("angleDeg"), 55),
+    tension: parseNumber(searchParams.get("tension"), 0.55),
+  }));
 
   const strands = useMemo(() => generateBraidGeometry(params), [params]);
   const result = useMemo(() => evaluateConstraints(params), [params]);
@@ -38,29 +68,48 @@ export default function HomePage() {
 
           <div className="flex items-center gap-2">
             <div className="hidden rounded-full border border-white/10 bg-white/5 px-3 py-1 text-xs text-white/70 md:block">
-              Rust-ready architecture • TS prototype
+              Frontend-only prototype • Rust/WASM ready
             </div>
+
             <button
-              className="rounded-md border border-white/10 bg-violet-500/15 px-3 py-1.5 text-xs text-violet-200 hover:bg-violet-500/25"
-              onClick={() => {
-                // Fake export action (frontend-only demo)
-                const payload = {
-                  params,
-                  result,
-                  exportedAt: new Date().toISOString(),
-                  note: "Concept export: not real machine instructions.",
-                };
-                navigator.clipboard
-                  .writeText(JSON.stringify(payload, null, 2))
-                  .catch(() => {});
+              className="rounded-md border border-white/10 bg-violet-500/15 px-3 py-1.5 text-xs text-violet-200 hover:bg-violet-500/25 active:scale-[0.99]"
+              onClick={async () => {
+                try {
+                  const query = new URLSearchParams({
+                    radius: String(params.radius),
+                    length: String(params.length),
+                    strandCount: String(params.strandCount),
+                    angleDeg: String(params.angleDeg),
+                    tension: String(params.tension),
+                  }).toString();
+
+                  const url = `${window.location.origin}?${query}`;
+
+                  await copyText(url);
+
+                  setToast("Share link copied ✅");
+                  window.setTimeout(() => setToast(null), 1600);
+                } catch (e) {
+                  setToast("Couldn’t copy. Select URL from address bar.");
+                  window.setTimeout(() => setToast(null), 2200);
+                }
               }}
-              title="Copies a demo export payload to clipboard"
+              title="Copies a shareable link containing the current params"
             >
-              Copy export payload
+              Copy share link
             </button>
           </div>
         </div>
       </div>
+
+      {/* Toast */}
+      {toast ? (
+        <div className="pointer-events-none fixed left-1/2 top-4 z-50 -translate-x-1/2">
+          <div className="rounded-full border border-white/10 bg-black/70 px-4 py-2 text-xs text-white/80 backdrop-blur">
+            {toast}
+          </div>
+        </div>
+      ) : null}
 
       {/* Layout */}
       <div className="mx-auto grid max-w-7xl grid-cols-1 gap-4 px-4 py-4 lg:grid-cols-12">
