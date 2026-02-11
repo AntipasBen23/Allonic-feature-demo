@@ -11,9 +11,25 @@ import {
   type BraidParams,
 } from "@/app/lib/braidMath";
 
-function parseNumber(value: string | null, fallback: number) {
+function parseNumberSafe(value: string | null, fallback: number) {
+  // Important: treat "" as missing, not 0
+  if (value === null || value.trim() === "") return fallback;
   const n = Number(value);
   return Number.isFinite(n) ? n : fallback;
+}
+
+function clamp(n: number, min: number, max: number) {
+  return Math.max(min, Math.min(max, n));
+}
+
+function sanitizeParams(p: BraidParams): BraidParams {
+  return {
+    radius: clamp(p.radius, 2, 40),
+    length: clamp(p.length, 20, 300),
+    strandCount: Math.round(clamp(p.strandCount, 6, 72)),
+    angleDeg: clamp(p.angleDeg, 10, 85),
+    tension: clamp(p.tension, 0, 1),
+  };
 }
 
 async function copyText(text: string) {
@@ -38,16 +54,23 @@ export default function HomeClient() {
   const searchParams = useSearchParams();
   const [toast, setToast] = useState<string | null>(null);
 
-  const [params, setParams] = useState<BraidParams>(() => ({
-    radius: parseNumber(searchParams.get("radius"), 12),
-    length: parseNumber(searchParams.get("length"), 120),
-    strandCount: parseNumber(searchParams.get("strandCount"), 24),
-    angleDeg: parseNumber(searchParams.get("angleDeg"), 55),
-    tension: parseNumber(searchParams.get("tension"), 0.55),
-  }));
+  const [params, setParams] = useState<BraidParams>(() => {
+    const initial = sanitizeParams({
+      radius: parseNumberSafe(searchParams.get("radius"), 12),
+      length: parseNumberSafe(searchParams.get("length"), 120),
+      strandCount: parseNumberSafe(searchParams.get("strandCount"), 24),
+      angleDeg: parseNumberSafe(searchParams.get("angleDeg"), 55),
+      tension: parseNumberSafe(searchParams.get("tension"), 0.55),
+    });
 
-  const strands = useMemo(() => generateBraidGeometry(params), [params]);
-  const result = useMemo(() => evaluateConstraints(params), [params]);
+    return initial;
+  });
+
+  // Ensure any updates remain valid (extra safety)
+  const safeParams = useMemo(() => sanitizeParams(params), [params]);
+
+  const strands = useMemo(() => generateBraidGeometry(safeParams), [safeParams]);
+  const result = useMemo(() => evaluateConstraints(safeParams), [safeParams]);
 
   return (
     <main className="min-h-screen bg-[#07070B] text-white">
@@ -72,15 +95,15 @@ export default function HomeClient() {
               className="rounded-md border border-white/10 bg-violet-500/15 px-3 py-1.5 text-xs text-violet-200 hover:bg-violet-500/25 active:scale-[0.99]"
               onClick={async () => {
                 try {
-                  const query = new URLSearchParams({
-                    radius: String(params.radius),
-                    length: String(params.length),
-                    strandCount: String(params.strandCount),
-                    angleDeg: String(params.angleDeg),
-                    tension: String(params.tension),
+                  const q = new URLSearchParams({
+                    radius: String(safeParams.radius),
+                    length: String(safeParams.length),
+                    strandCount: String(safeParams.strandCount),
+                    angleDeg: String(safeParams.angleDeg),
+                    tension: String(safeParams.tension),
                   }).toString();
 
-                  const url = `${window.location.origin}?${query}`;
+                  const url = `${window.location.origin}?${q}`;
                   await copyText(url);
 
                   setToast("Share link copied ✅");
@@ -111,7 +134,10 @@ export default function HomeClient() {
       <div className="mx-auto grid max-w-7xl grid-cols-1 gap-4 px-4 py-4 lg:grid-cols-12">
         {/* Left: controls */}
         <section className="lg:col-span-4">
-          <BraidControls params={params} onChange={setParams} />
+          <BraidControls
+            params={safeParams}
+            onChange={(next) => setParams(sanitizeParams(next))}
+          />
         </section>
 
         {/* Middle: viewport */}
