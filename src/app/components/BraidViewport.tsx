@@ -64,7 +64,7 @@ function Scene({ strands }: Props) {
 
 export default function BraidViewport({ strands }: Props) {
   return (
-    <div className="h-full w-full overflow-hidden rounded-xl border border-white/10 bg-black/40">
+    <div className="relative h-full w-full overflow-hidden rounded-xl border border-white/10 bg-black/40">
       <Canvas
         camera={{ position: [60, 40, 140], fov: 45, near: 0.1, far: 2000 }}
       >
