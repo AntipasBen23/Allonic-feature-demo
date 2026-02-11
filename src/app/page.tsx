@@ -1,65 +1,105 @@
-import Image from "next/image";
+"use client";
 
-export default function Home() {
+import React, { useMemo, useState } from "react";
+import BraidControls from "@/app/components/BraidControls";
+import BraidViewport from "@/app/components/BraidViewport";
+import ConstraintPanel from "@/app/components/ConstraintPanel";
+import {
+  evaluateConstraints,
+  generateBraidGeometry,
+  type BraidParams,
+} from "@/app/lib/braidMath";
+
+export default function HomePage() {
+  const [params, setParams] = useState<BraidParams>({
+    radius: 12,
+    length: 120,
+    strandCount: 24,
+    angleDeg: 55,
+    tension: 0.55,
+  });
+
+  const strands = useMemo(() => generateBraidGeometry(params), [params]);
+  const result = useMemo(() => evaluateConstraints(params), [params]);
+
   return (
-    <div className="flex min-h-screen items-center justify-center bg-zinc-50 font-sans dark:bg-black">
-      <main className="flex min-h-screen w-full max-w-3xl flex-col items-center justify-between py-32 px-16 bg-white dark:bg-black sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
-        />
-        <div className="flex flex-col items-center gap-6 text-center sm:items-start sm:text-left">
-          <h1 className="max-w-xs text-3xl font-semibold leading-10 tracking-tight text-black dark:text-zinc-50">
-            To get started, edit the page.tsx file.
-          </h1>
-          <p className="max-w-md text-lg leading-8 text-zinc-600 dark:text-zinc-400">
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
+    <main className="min-h-screen bg-[#07070B] text-white">
+      {/* Top bar */}
+      <div className="border-b border-white/10 bg-black/30 backdrop-blur">
+        <div className="mx-auto flex max-w-7xl items-center justify-between px-4 py-4">
+          <div>
+            <div className="text-sm font-semibold tracking-wide">
+              Tissue Braiding Preflight
+            </div>
+            <div className="text-xs text-white/50">
+              Constraint feedback before “machine code”
+            </div>
+          </div>
+
+          <div className="flex items-center gap-2">
+            <div className="hidden rounded-full border border-white/10 bg-white/5 px-3 py-1 text-xs text-white/70 md:block">
+              Rust-ready architecture • TS prototype
+            </div>
+            <button
+              className="rounded-md border border-white/10 bg-violet-500/15 px-3 py-1.5 text-xs text-violet-200 hover:bg-violet-500/25"
+              onClick={() => {
+                // Fake export action (frontend-only demo)
+                const payload = {
+                  params,
+                  result,
+                  exportedAt: new Date().toISOString(),
+                  note: "Concept export: not real machine instructions.",
+                };
+                navigator.clipboard
+                  .writeText(JSON.stringify(payload, null, 2))
+                  .catch(() => {});
+              }}
+              title="Copies a demo export payload to clipboard"
             >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Learning
-            </a>{" "}
-            center.
-          </p>
+              Copy export payload
+            </button>
+          </div>
         </div>
-        <div className="flex flex-col gap-4 text-base font-medium sm:flex-row">
-          <a
-            className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-foreground px-5 text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc] md:w-[158px]"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={16}
-            />
-            Deploy Now
-          </a>
-          <a
-            className="flex h-12 w-full items-center justify-center rounded-full border border-solid border-black/[.08] px-5 transition-colors hover:border-transparent hover:bg-black/[.04] dark:border-white/[.145] dark:hover:bg-[#1a1a1a] md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Documentation
-          </a>
+      </div>
+
+      {/* Layout */}
+      <div className="mx-auto grid max-w-7xl grid-cols-1 gap-4 px-4 py-4 lg:grid-cols-12">
+        {/* Left: controls */}
+        <section className="lg:col-span-4">
+          <BraidControls params={params} onChange={setParams} />
+        </section>
+
+        {/* Middle: viewport */}
+        <section className="relative lg:col-span-5">
+          <div className="h-[520px] lg:h-[calc(100vh-140px)]">
+            <BraidViewport strands={strands} />
+          </div>
+
+          <div className="mt-3 rounded-xl border border-white/10 bg-black/40 p-4">
+            <div className="text-xs text-white/60">
+              <span className="text-white/80">Intent:</span> reduce physical
+              iteration loops by surfacing manufacturability constraints at
+              design-time. This geometry preview is a conceptual helix-based
+              braid model.
+            </div>
+          </div>
+        </section>
+
+        {/* Right: diagnostics */}
+        <section className="lg:col-span-3">
+          <ConstraintPanel result={result} />
+        </section>
+      </div>
+
+      {/* Footer */}
+      <div className="mx-auto max-w-7xl px-4 pb-10">
+        <div className="mt-4 rounded-xl border border-white/10 bg-black/30 p-4">
+          <div className="text-xs text-white/55">
+            Prototype goals: (1) constraint visibility, (2) fast iteration UX,
+            (3) architecture that can move the constraint engine to Rust/WASM.
+          </div>
         </div>
-      </main>
-    </div>
+      </div>
+    </main>
   );
 }
